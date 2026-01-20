@@ -1,0 +1,33 @@
+services:
+  netalertx:
+    network_mode: host   # Use host networking for ARP scanning and other services
+    image: ghcr.io/jokob-sk/netalertx-dev:latest
+    container_name: netalertx
+    restart: unless-stopped
+    read_only: true                                 # Make the container filesystem read-only
+    
+    # It is most secure to start with user 20211, but then we lose provisioning capabilities.
+    # user: "${NETALERTX_UID:-20211}:${NETALERTX_GID:-20211}"
+    cap_drop:                                       # Drop all capabilities for enhanced security
+      - ALL
+    cap_add:                                        # Add only the necessary capabilities
+      - NET_ADMIN                                   # Required for scanning with arp-scan, nmap, nbtscan, traceroute, and zero-conf
+      - NET_RAW                                     # Required for raw socket operations with arp-scan, nmap, nbtscan, traceroute and zero-conf
+      - NET_BIND_SERVICE                            # Required to bind to privileged ports with nbtscan
+      - CHOWN                                       # Required for root-entrypoint to chown /data + /tmp before dropping privileges
+      - SETUID                                      # Required for root-entrypoint to switch to non-root user
+      - SETGID                                      # Required for root-entrypoint to switch to non-root group                  
+
+    environment:
+      PUID: ${NETALERTX_UID:-20211}                             # Runtime UID after priming (Synology/no-copy-up safe)
+      PGID: ${NETALERTX_GID:-20211}                             # Runtime GID after priming (Synology/no-copy-up safe)
+      LISTEN_ADDR: ${LISTEN_ADDR:-0.0.0.0}                      # Listen for connections on all interfaces
+      PORT: ${PORT:-20211}                                      # Application port
+      GRAPHQL_PORT: ${GRAPHQL_PORT:-20212}                      # GraphQL API port
+      ALWAYS_FRESH_INSTALL: ${ALWAYS_FRESH_INSTALL:-false}      # Set to true to reset your config and database on each container start
+      NETALERTX_DEBUG: ${NETALERTX_DEBUG:-0}                    # 0=kill all services and restart if any dies. 1 keeps running dead services.
+
+    volumes:
+      - ./data:/data
+    tmpfs:
+      - "/tmp:mode=1700,uid=0,gid=0,rw,noexec,nosuid,nodev,async,noatime,nodiratime"

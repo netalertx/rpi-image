@@ -1,0 +1,24 @@
+{
+	"name": "RPi Image Builder",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": "."
+	},
+	"runArgs": [
+		"--privileged"
+	],
+	"features": {
+		"ghcr.io/devcontainers/features/docker-from-docker:1": {
+			"version": "latest"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.docker",
+				"github.vscode-github-actions"
+			]
+		}
+	},
+	"postAttachCommand": "mkdir -p /home/vscode/.docker && echo '{}' > /home/vscode/.docker/config.json && mkdir -p /home/vscode/.config/act && echo \"default_image: medium\" > /home/vscode/.config/act/actrc"
+}

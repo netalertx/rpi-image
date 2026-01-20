@@ -1,0 +1,8 @@
+[Unit]
+Description=NetAlertX Image Updater
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/netalertx/update_image.sh

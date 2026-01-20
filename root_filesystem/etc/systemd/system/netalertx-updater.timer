@@ -1,0 +1,10 @@
+[Unit]
+Description=Run NetAlertX Image Updater hourly
+
+[Timer]
+OnBootSec=1h
+OnUnitActiveSec=1h
+Unit=netalertx-updater.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+# RPi Image Build Artifacts
+*.img
+*.img.xz
+*.img.gz
+*.zip
+
+# Act temporary files
+.act/
+/tmp/artifacts/
+netalertx-rpi-image-dev/

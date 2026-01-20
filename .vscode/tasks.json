@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build RPi Image Locally (dev)",
+            "type": "shell",
+            "icon": {
+                "id": "tools",
+                "color": "terminal.ansiYellow"
+            },
+            "command": "/bin/bash",
+            "args": [
+                "-c",
+                "./.devcontainer/scripts/build_local_dev.sh"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "clear": true,
+                "showReuseMessage": false
+            },
+            "detail": "Runs build, extracts artifacts, and renames them to fixed 'netalertx-dev' filenames."
+        }
+    ]
+}

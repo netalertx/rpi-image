@@ -1,0 +1,17 @@
+[Unit]
+Description=NetAlertX Docker Compose
+Wants=docker.service network-online.target
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/opt/netalertx
+TimeoutStartSec=0
+# WAITS for Docker Socket, then ensures default user is in docker group
+ExecStartPre=/bin/bash -c 'until /usr/bin/docker info > /dev/null 2>&1; do sleep 1; done; (id -nu 1000 && usermod -aG docker $(id -nu 1000)) || true'
+ExecStart=/usr/bin/docker compose up -d --force-recreate
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target
