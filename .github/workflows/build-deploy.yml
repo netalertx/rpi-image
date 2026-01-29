@@ -40,10 +40,10 @@ jobs:
           TS_FILE=$(date +%Y-%m-%d_%H-%M-%S)
           
           if [ "$VARIANT" == "prod" ]; then
-            IMAGE="netalertx:latest"
+            IMAGE="jokobsk/netalertx:latest"
             NAME_SUFFIX=""
           else
-            IMAGE="ghcr.io/jokob-sk/netalertx-dev:latest"
+            IMAGE="ghcr.io/netalertx/netalertx-dev:latest"
             NAME_SUFFIX=" (Dev)"
           fi
 
