@@ -1,5 +1,32 @@
 name: Build NetAlertX RPi Images
 
+# -------------------------------------------------------------------------------------------------
+# DUAL-MODE WORKFLOW DOCUMENTATION
+#
+# 1. REMOTE EXECUTION (GitHub Actions):
+#    - Job: 'build'
+#      - Builds the disk image.
+#      - Generates 'fragment_*.json' with https://github.com/... download URLs.
+#      - Uploads artifacts (image + json) to GitHub Storage.
+#    - Job: 'release'
+#      - Downloads artifacts.
+#      - Merges fragments into 'repo.json'.
+#      - Commits 'repo.json' to the repository.
+#      - Creates a GitHub Release with the images.
+#
+# 2. LOCAL EXECUTION (via 'act' & .devcontainer/scripts/build_local_dev.sh):
+#    - Job: 'build'
+#      - Runs inside a local container.
+#      - Detects 'env.ACT=true' (injected by 'act').
+#      - Generates 'fragment_*.json' with file://... placeholder URLs.
+#      - 'act' saves artifacts to a local temp directory (e.g., /tmp/artifacts).
+#    - Job: 'release'
+#      - SKIPPED (guarded by 'if: !is_act').
+#    - Post-Process (Shell Script):
+#      - The local script 'build_local_dev.sh' picks up the artifacts.
+#      - It generates the final local 'repo.json'.
+# -------------------------------------------------------------------------------------------------
+
 on:
   push:
     branches: [ main ]
@@ -11,16 +38,31 @@ jobs:
   build:
     name: Build ${{ matrix.variant }}
     runs-on: ubuntu-latest
+    outputs:
+      is_act: ${{ steps.check_env.outputs.is_act }}
     strategy:
       fail-fast: false
       matrix:
         variant: [prod, dev]
+    
+    # Permissions: 'contents: write' is primarily needed for the 'release' job (to push tags/commits).
+    # It is kept here in 'build' for consistency/safety, though 'build' mostly just reads.
     permissions:
       contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Differentiate between Local ('act') and Remote (GitHub) environments
+      - name: Check Environment
+        id: check_env
+        run: |
+          if [ "${{ env.ACT }}" = "true" ]; then
+            echo "is_act=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_act=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set Variables
         id: vars
@@ -30,7 +72,7 @@ jobs:
           TS_FILE=$(date +%Y-%m-%d_%H-%M-%S)
           
           if [ "$VARIANT" == "prod" ]; then
-            IMAGE="netalertx/netalertx:latest"
+            IMAGE="jokobsk/netalertx:latest"
             NAME_SUFFIX=""
           else
             IMAGE="ghcr.io/netalertx/netalertx-dev:latest"
@@ -142,7 +184,11 @@ jobs:
           DOWNLOAD_SIZE=$(stat -c%s $IMG_FILENAME)
           DOWNLOAD_SHA256=$(sha256sum $IMG_FILENAME | awk '{print $1}')
           
-          # Decide URL based on environment
+          # ---------------------------------------------------------------------
+          # URL GENERATION:
+          # Local (ACT): Uses 'file://' with a placeholder path for local testing.
+          # Remote: Uses standard GitHub Releases URL.
+          # ---------------------------------------------------------------------
           if [ "${{ env.ACT }}" == "true" ]; then
             DOWNLOAD_URL="file://__LOCAL_PATH__/netalertx-rpi-image-dev/$IMG_FILENAME"
             NAME_ENV=" (LOCAL)"
@@ -187,7 +233,11 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ !env.ACT }}
+    # -------------------------------------------------------------------------
+    # REMOTE ONLY: This job is skipped in local 'act' runs.
+    # It aggregates artifacts, commits 'repo.json', and publishes the release.
+    # -------------------------------------------------------------------------
+    if: ${{ needs.build.outputs.is_act != 'true' }}
     permissions:
       contents: write
     steps:
