@@ -6,16 +6,6 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      variant:
-        description: 'Variant to build'
-        required: true
-        default: 'both'
-        type: choice
-        options:
-          - both
-          - prod
-          - dev
 
 jobs:
   build:
@@ -40,7 +30,7 @@ jobs:
           TS_FILE=$(date +%Y-%m-%d_%H-%M-%S)
           
           if [ "$VARIANT" == "prod" ]; then
-            IMAGE="jokobsk/netalertx:latest"
+            IMAGE="netalertx/netalertx:latest"
             NAME_SUFFIX=""
           else
             IMAGE="ghcr.io/netalertx/netalertx-dev:latest"
@@ -60,15 +50,8 @@ jobs:
           echo "name_suffix=$NAME_SUFFIX" >> $GITHUB_OUTPUT
           echo "pr_info=$PR_INFO" >> $GITHUB_OUTPUT
 
-      - name: Cache apt binaries
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/build-deploy.yml') }}
-
       - name: Install dependencies
         run: |
-          sudo mkdir -p /var/cache/apt/archives
           sudo apt-get update -q
           sudo apt-get install -yq qemu-user-static binfmt-support wget unzip parted jq
 
@@ -79,30 +62,20 @@ jobs:
           LATEST_DIR=$(curl -sL "$BASE_URL" | grep -o 'href="raspios_lite_arm64-[0-9-]*\/"' | cut -d'"' -f2 | sort | tail -n 1)
           IMAGE_FILENAME=$(curl -sL "${BASE_URL}${LATEST_DIR}" | grep -o 'href="[^"]*\.img\.xz"' | head -1 | cut -d'"' -f2)
           URL="${BASE_URL}${LATEST_DIR}${IMAGE_FILENAME}"
-          
-          echo "Downloading from: $URL"
           wget -q -O rpi.img.xz "$URL"
           unxz -f rpi.img.xz
           truncate -s +1200M rpi.img
           parted rpi.img resizepart 2 100%
-
-          for i in {0..255};
-          do
-            if [ ! -e /dev/loop$i ]; then
-              sudo mknod /dev/loop$i b 7 $i
-            fi
-          done
+          for i in {0..255}; do [ ! -e /dev/loop$i ] && sudo mknod /dev/loop$i b 7 $i; done
           LOOP=$(sudo losetup -fP --show rpi.img)
           echo "LOOP_DEV=$LOOP" >> $GITHUB_ENV
-          
           LOOP_NAME=$(basename $LOOP)
-          for part in /sys/block/$LOOP_NAME/${LOOP_NAME}p*;
-          do
+          for part in /sys/block/$LOOP_NAME/${LOOP_NAME}p*; do
             if [ -d "$part" ]; then
               PART_NAME=$(basename $part)
               if [ ! -e /dev/$PART_NAME ]; then
                 MAJMIN=$(cat $part/dev)
-                sudo mknod /dev/$PART_NAME b ${MAJMIN%:*} ${MAJMIN#*:}
+                sudo mknod /dev/$PART_NAME b ${MAJMIN%:*} ${MAJMIN#*:} 
               fi
             fi
           done
@@ -122,20 +95,15 @@ jobs:
 
       - name: Pre-load Docker Image
         run: |
-          echo "Pulling ${{ steps.vars.outputs.image }}"...
           docker pull --platform linux/arm64 ${{ steps.vars.outputs.image }}
           docker save ${{ steps.vars.outputs.image }} -o netalertx_image.tar
-
           DIND_ID=$(docker run --privileged -d docker:dind --storage-driver overlay2)
           until docker exec $DIND_ID docker info >/dev/null 2>&1; do sleep 1; done
-
           docker cp netalertx_image.tar $DIND_ID:/img.tar
           docker exec $DIND_ID docker load -i /img.tar
-          
           sudo rm -rf target/var/lib/docker
           sudo mkdir -p target/var/lib/docker
-          docker exec $DIND_ID tar -C /var/lib/docker -cf - . | sudo tar -C target/var/lib/docker -xf -
-
+          docker exec $DIND_ID tar -C /var/lib/docker -cf - . | sudo tar -C target/var/lib/docker -xf - 
           docker stop $DIND_ID && docker rm $DIND_ID
           rm netalertx_image.tar
 
@@ -150,19 +118,12 @@ jobs:
             echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
             apt-get update -q
             apt-get install -yq --no-install-recommends docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            systemctl enable docker
-            ln -fs /usr/lib/systemd/system/docker.service /etc/systemd/system/multi-user.target.wants/docker.service
-            
-            # Enable Updater
-            systemctl enable netalertx-updater.timer
-            
-            systemctl enable netalertx
-            ln -fs /etc/systemd/system/netalertx.service /etc/systemd/system/multi-user.target.wants/netalertx.service
+            systemctl enable docker netalertx-updater.timer netalertx
           CHROOT
 
       - name: Configure NetAlertX
         run: |
-          sudo sed -i "s|ghcr.io/jokob-sk/netalertx-dev:latest|${{ steps.vars.outputs.image }}|g" target/opt/netalertx/docker-compose.yml
+          sudo sed -i "s|ghcr.io/netalertx/netalertx-dev:latest|${{ steps.vars.outputs.image }}|g" target/opt/netalertx/docker-compose.yml
 
       - name: Cleanup & Compress
         run: |
@@ -173,23 +134,25 @@ jobs:
           sudo umount -lR target || true
           sleep 1
           sudo losetup -d ${{ env.LOOP_DEV }} || true
-
           EXTRACT_SIZE=$(stat -c%s rpi.img)
           EXTRACT_SHA256=$(sha256sum rpi.img | awk '{print $1}')
-
           xz -v -9 -T 0 rpi.img
           IMG_FILENAME="netalertx-rpi-${{ steps.vars.outputs.variant }}-${{ steps.vars.outputs.timestamp_file }}.img.xz"
           mv rpi.img.xz $IMG_FILENAME
-
           DOWNLOAD_SIZE=$(stat -c%s $IMG_FILENAME)
           DOWNLOAD_SHA256=$(sha256sum $IMG_FILENAME | awk '{print $1}')
           
-          # Generate Fragment for Main Repo (GitHub URL)
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.variant }}-${{ steps.vars.outputs.timestamp_file }}/$IMG_FILENAME"
+          # Decide URL based on environment
+          if [ "${{ env.ACT }}" == "true" ]; then
+            DOWNLOAD_URL="file://__LOCAL_PATH__/netalertx-rpi-image-dev/$IMG_FILENAME"
+            NAME_ENV=" (LOCAL)"
+          else
+            DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/__RELEASE_TAG__/$IMG_FILENAME"
+            NAME_ENV=""
+          fi
           
-          # Create JSON object for this variant
           jq -n \
-            --arg name "NetAlertX${{ steps.vars.outputs.name_suffix }} ${{ steps.vars.outputs.pr_info }}" \
+            --arg name "NetAlertX${{ steps.vars.outputs.name_suffix }}${NAME_ENV} ${{ steps.vars.outputs.pr_info }}" \
             --arg desc "NetAlertX ${{ matrix.variant }} Build (${{ steps.vars.outputs.timestamp }})." \
             --arg date "${{ steps.vars.outputs.timestamp }}" \
             --arg url "$DOWNLOAD_URL" \
@@ -212,32 +175,6 @@ jobs:
               capabilities: ["rpi_connect"]
             }' > "fragment_${{ matrix.variant }}.json"
 
-          # Generate Fragment for Local Testing (File URI)
-          LOCAL_URL="file:///home/adamoutler/git/rpi-image/netalertx-rpi-image-dev/$IMG_FILENAME"
-          jq -n \
-            --arg name "NetAlertX${{ steps.vars.outputs.name_suffix }} (LOCAL) ${{ steps.vars.outputs.pr_info }}" \
-            --arg desc "LOCAL Build (${{ steps.vars.outputs.timestamp }})." \
-            --arg date "${{ steps.vars.outputs.timestamp }}" \
-            --arg url "$LOCAL_URL" \
-            --argjson dl_size $DOWNLOAD_SIZE \
-            --arg dl_sha "$DOWNLOAD_SHA256" \
-            --argjson ex_size $EXTRACT_SIZE \
-            --arg ex_sha "$EXTRACT_SHA256" \
-            '{ 
-              name: $name,
-              description: $desc,
-              icon: "https://raw.githubusercontent.com/netalertx/NetAlertX/refs/heads/main/docs/img/NetAlertX_logo.png",
-              release_date: $date,
-              url: $url,
-              image_download_size: $dl_size,
-              image_download_sha256: $dl_sha,
-              extract_size: $ex_size,
-              extract_sha256: $ex_sha,
-              init_format: "cloudinit-rpi",
-              devices: ["pi5-64bit", "pi4-64bit", "pi3-64bit", "pi02w-64bit"],
-              capabilities: ["rpi_connect"]
-            }' > "fragment_local_${{ matrix.variant }}.json"
-
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -250,28 +187,18 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
+    if: ${{ !env.ACT }}
     permissions:
       contents: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
-
-      - name: Merge Repository JSONs
-        run: |
-          echo "Merging JSON fragments..."
-          # Create Production repo.json
-          jq -n '{os_list: [inputs]}' artifacts/fragment_prod.json artifacts/fragment_dev.json > repo.json
-          
-          # Create Local repo_local.json
-          jq -n '{os_list: [inputs]}' artifacts/fragment_local_prod.json artifacts/fragment_local_dev.json > repo_local.json
-          
-          # Cleanup fragments so they don't get released
-          rm artifacts/fragment_*.json
-          
-          cat repo.json
 
       - name: Set Release Variables
         id: vars
@@ -279,19 +206,33 @@ jobs:
           TS_FILE=$(date +%Y-%m-%d_%H-%M-%S)
           echo "tag_name=rel-$TS_FILE" >> $GITHUB_OUTPUT
 
+      - name: Merge Repository JSONs
+        run: |
+          echo "Merging JSON fragments..."
+          jq -n '{os_list: [inputs]}' artifacts/fragment_prod.json artifacts/fragment_dev.json \
+            | sed "s/__RELEASE_TAG__/${{ steps.vars.outputs.tag_name }}/g" > repo.json
+          
+          # Cleanup fragments
+          rm artifacts/fragment_*.json
+
+      - name: Commit and Push repo.json
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add repo.json
+          git commit -m "chore: update repo.json for release ${{ steps.vars.outputs.tag_name }}"
+          git push
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             artifacts/*.img.xz
-            repo.json
-            repo_local.json
           tag_name: ${{ steps.vars.outputs.tag_name }}
           name: NetAlertX RPi Images ${{ steps.vars.outputs.tag_name }}
           prerelease: true
           body: |
             Automated NetAlertX Raspberry Pi Image Release.
-            Contains both Production (Stable) and Development (Latest) variants.
             
             **Installation:**
-            Use Raspberry Pi Imager and select `repo.json` (URL) or `repo_local.json` (Local File).
+            Use Raspberry Pi Imager and select `repo.json` (URL).

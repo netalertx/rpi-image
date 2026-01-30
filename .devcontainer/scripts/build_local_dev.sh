@@ -54,26 +54,29 @@ fi
 echo "Directory contents:"
 ls -la "$TARGET_DIR"
 
-# Generate repo_local.json from fragment
-FRAGMENT="$TARGET_DIR/fragment_local_dev.json"
+# Generate repo.json from fragment
+FRAGMENT="$TARGET_DIR/fragment_dev.json"
 if [ -f "$FRAGMENT" ]; then
-    echo "Generating repo_local.json from fragment..."
-    # We need jq installed locally for this to work elegantly, 
-    # but we can do simple wrapping since we know the structure.
+    echo "Generating repo.json from fragment..."
+    CURRENT_DIR=$(pwd)
+    
+    # Wrap fragment in os_list
     if command -v jq &> /dev/null; then
-        jq -n '{os_list: [inputs]}' "$FRAGMENT" > "$TARGET_DIR/repo_local.json"
+        jq -n '{os_list: [inputs]}' "$FRAGMENT" > "$TARGET_DIR/repo.json"
     else
-        # Fallback if jq is missing: manual concatenation
-        echo "{ \"os_list\": [" > "$TARGET_DIR/repo_local.json"
-        cat "$FRAGMENT" >> "$TARGET_DIR/repo_local.json"
-        echo "] }" >> "$TARGET_DIR/repo_local.json"
+        echo "{ \"os_list\": [" > "$TARGET_DIR/repo.json"
+        cat "$FRAGMENT" >> "$TARGET_DIR/repo.json"
+        echo "] }" >> "$TARGET_DIR/repo.json"
     fi
-    echo "Created repo_local.json"
+    
+    # Inject dynamic paths
+    sed -i "s|__LOCAL_PATH__|$CURRENT_DIR|g" "$TARGET_DIR/repo.json"
+    echo "Created repo.json with local path injection."
     
     # Cleanup fragments locally
     sudo rm "$TARGET_DIR"/fragment_*.json
 else
-    echo "Warning: fragment_local_dev.json not found. repo_local.json cannot be generated."
+    echo "Warning: fragment_dev.json not found. repo.json cannot be generated."
 fi
 
 # Validation output

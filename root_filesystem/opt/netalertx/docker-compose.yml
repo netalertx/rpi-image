@@ -1,7 +1,7 @@
 services:
   netalertx:
     network_mode: host   # Use host networking for ARP scanning and other services
-    image: ghcr.io/jokob-sk/netalertx-dev:latest
+    image: ghcr.io/netalertx/netalertx-dev:latest
     container_name: netalertx
     restart: unless-stopped
     read_only: true                                 # Make the container filesystem read-only
