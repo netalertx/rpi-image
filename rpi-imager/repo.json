@@ -1,0 +1,46 @@
+{
+  "os_list": [
+    {
+      "name": "NetAlertX ",
+      "description": "NetAlertX prod Build (2026-01-30).",
+      "icon": "https://raw.githubusercontent.com/netalertx/NetAlertX/refs/heads/main/docs/img/NetAlertX_logo.png",
+      "release_date": "2026-01-30",
+      "url": "https://github.com/adamoutler/rpi-image/releases/download/rel-2026-01-30_23-12-26/netalertx-rpi-prod-2026-01-30_22-57-36.img.xz",
+      "image_download_size": 762242808,
+      "image_download_sha256": "0bdd1bda98bd8e85727ed04322be23fbf07fb11bb80698c1a140fe1a0d11ac7e",
+      "extract_size": 4244635648,
+      "extract_sha256": "167a1cebec95a936a6b2a95e800a8d0805b11c9638a9bbda45d8336c9b87b71c",
+      "init_format": "cloudinit-rpi",
+      "devices": [
+        "pi5-64bit",
+        "pi4-64bit",
+        "pi3-64bit",
+        "pi02w-64bit"
+      ],
+      "capabilities": [
+        "rpi_connect"
+      ]
+    },
+    {
+      "name": "NetAlertX (Dev) ",
+      "description": "NetAlertX dev Build (2026-01-30).",
+      "icon": "https://raw.githubusercontent.com/netalertx/NetAlertX/refs/heads/main/docs/img/NetAlertX_logo.png",
+      "release_date": "2026-01-30",
+      "url": "https://github.com/adamoutler/rpi-image/releases/download/rel-2026-01-30_23-12-26/netalertx-rpi-dev-2026-01-30_22-57-36.img.xz",
+      "image_download_size": 762893796,
+      "image_download_sha256": "84c7359372835183ad4f7ded106742ca44e3cd15fbcdfb7fed596fee27486870",
+      "extract_size": 4244635648,
+      "extract_sha256": "6a850c9d6f825686b035c5826d94b3c1448e0546f4cce7e5b4ff706d10e52787",
+      "init_format": "cloudinit-rpi",
+      "devices": [
+        "pi5-64bit",
+        "pi4-64bit",
+        "pi3-64bit",
+        "pi02w-64bit"
+      ],
+      "capabilities": [
+        "rpi_connect"
+      ]
+    }
+  ]
+}

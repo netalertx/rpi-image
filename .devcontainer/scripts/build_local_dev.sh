@@ -60,18 +60,21 @@ if [ -f "$FRAGMENT" ]; then
     echo "Generating repo.json from fragment..."
     CURRENT_DIR=$(pwd)
     
+    # Create sub-directory for repo.json to match remote structure
+    mkdir -p "$TARGET_DIR/rpi-imager"
+
     # Wrap fragment in os_list
     if command -v jq &> /dev/null; then
-        jq -n '{os_list: [inputs]}' "$FRAGMENT" > "$TARGET_DIR/repo.json"
+        jq -n '{os_list: [inputs]}' "$FRAGMENT" > "$TARGET_DIR/rpi-imager/repo.json"
     else
-        echo "{ \"os_list\": [" > "$TARGET_DIR/repo.json"
-        cat "$FRAGMENT" >> "$TARGET_DIR/repo.json"
-        echo "] }" >> "$TARGET_DIR/repo.json"
+        echo "{ \"os_list\": [" > "$TARGET_DIR/rpi-imager/repo.json"
+        cat "$FRAGMENT" >> "$TARGET_DIR/rpi-imager/repo.json"
+        echo "] }" >> "$TARGET_DIR/rpi-imager/repo.json"
     fi
     
     # Inject dynamic paths
-    sed -i "s|__LOCAL_PATH__|$CURRENT_DIR|g" "$TARGET_DIR/repo.json"
-    echo "Created repo.json with local path injection."
+    sed -i "s|__LOCAL_PATH__|$CURRENT_DIR|g" "$TARGET_DIR/rpi-imager/repo.json"
+    echo "Created rpi-imager/repo.json with local path injection."
     
     # Cleanup fragments locally
     sudo rm "$TARGET_DIR"/fragment_*.json

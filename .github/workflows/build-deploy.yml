@@ -260,7 +260,7 @@ jobs:
         run: |
           echo "Merging JSON fragments..."
           jq -n '{os_list: [inputs]}' artifacts/fragment_prod.json artifacts/fragment_dev.json \
-            | sed "s/__RELEASE_TAG__/${{ steps.vars.outputs.tag_name }}/g" > repo.json
+            | sed "s/__RELEASE_TAG__/${{ steps.vars.outputs.tag_name }}/g" > rpi-imager/repo.json
           
           # Cleanup fragments
           rm artifacts/fragment_*.json
@@ -269,7 +269,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add repo.json
+          git add rpi-imager/repo.json
           git commit -m "chore: update repo.json for release ${{ steps.vars.outputs.tag_name }}"
           git push
 

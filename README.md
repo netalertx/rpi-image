@@ -30,7 +30,7 @@ It should look like this:
 *   Click **APP OPTIONS** (bottom left) -> **Content Repository**.
 *   Paste the following URL and click **Save**:
     ```text
-    https://raw.githubusercontent.com/netalertx/rpi-image/main/repo.json
+    https://raw.githubusercontent.com/netalertx/rpi-image/refs/heads/master/rpi-imager/repo.json
     ```
 
 ### 2. Wizard Setup
