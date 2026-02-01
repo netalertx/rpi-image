@@ -17,6 +17,8 @@ services:
       - CHOWN                                       # Required for root-entrypoint to chown /data + /tmp before dropping privileges
       - SETUID                                      # Required for root-entrypoint to switch to non-root user
       - SETGID                                      # Required for root-entrypoint to switch to non-root group                  
+    security_opt:
+      - apparmor:unconfined
 
     environment:
       PUID: ${NETALERTX_UID:-20211}                             # Runtime UID after priming (Synology/no-copy-up safe)
