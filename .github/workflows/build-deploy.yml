@@ -141,11 +141,15 @@ jobs:
           docker save ${{ steps.vars.outputs.image }} -o netalertx_image.tar
           DIND_ID=$(docker run --privileged -d docker:dind --storage-driver overlay2)
           until docker exec $DIND_ID docker info >/dev/null 2>&1; do sleep 1; done
+          docker exec $DIND_ID apk add --no-cache tar
           docker cp netalertx_image.tar $DIND_ID:/img.tar
           docker exec $DIND_ID docker load -i /img.tar
           sudo rm -rf target/var/lib/docker
           sudo mkdir -p target/var/lib/docker
-          docker exec $DIND_ID tar -C /var/lib/docker -cf - . | sudo tar -C target/var/lib/docker -xf - 
+          # Add xattrs flags to both tar commands
+          docker exec $DIND_ID tar --xattrs --xattrs-include='security.capability' -C /var/lib/docker -cf - . | \
+          sudo tar --xattrs --xattrs-include='security.capability' -C target/var/lib/docker -xf - 
+          
           docker stop $DIND_ID && docker rm $DIND_ID
           rm netalertx_image.tar
 
