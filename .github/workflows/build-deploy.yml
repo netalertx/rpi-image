@@ -144,13 +144,10 @@ jobs:
 
       - name: Pre-load Docker Image
         run: |
-          docker pull --platform linux/arm64 ${{ steps.vars.outputs.image }}
-          docker save ${{ steps.vars.outputs.image }} -o netalertx_image.tar
           DIND_ID=$(docker run --privileged -d docker:dind --storage-driver overlay2)
           until docker exec $DIND_ID docker info >/dev/null 2>&1; do sleep 1; done
           docker exec $DIND_ID apk add --no-cache tar
-          docker cp netalertx_image.tar $DIND_ID:/img.tar
-          docker exec $DIND_ID docker load -i /img.tar
+          docker exec $DIND_ID docker pull --platform linux/arm64 ${{ steps.vars.outputs.image }}
           sudo rm -rf target/var/lib/docker
           sudo mkdir -p target/var/lib/docker
           # Add xattrs flags to both tar commands
@@ -158,7 +155,6 @@ jobs:
           sudo tar --xattrs --xattrs-include='security.capability' -C target/var/lib/docker -xf - 
           
           docker stop $DIND_ID && docker rm $DIND_ID
-          rm netalertx_image.tar
 
       - name: Install Packages & Services (Chroot)
         run: |
