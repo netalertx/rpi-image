@@ -52,7 +52,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Differentiate between Local ('act') and Remote (GitHub) environments
       - name: Check Environment
@@ -95,7 +95,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -yq qemu-user-static binfmt-support wget unzip parted jq python3-jsonschema
+          sudo apt-get install -yq qemu-user-static 2>/dev/null || sudo apt-get install -yq qemu-user qemu-user-binfmt
+          sudo apt-get install -yq binfmt-support wget unzip parted jq python3-jsonschema
 
       - name: Prepare Official Base Image
         run: |
@@ -129,7 +130,13 @@ jobs:
           mkdir -p target
           sudo mount "${{ env.LOOP_DEV }}p2" target
           sudo mount "${{ env.LOOP_DEV }}p1" target/boot/firmware
-          sudo cp /usr/bin/qemu-aarch64-static target/usr/bin/
+          sudo /usr/lib/systemd/systemd-binfmt || true
+          if [ -f /usr/bin/qemu-aarch64-static ]; then
+            sudo cp /usr/bin/qemu-aarch64-static target/usr/bin/qemu-aarch64-static
+          elif [ -f /usr/bin/qemu-aarch64 ]; then
+            sudo cp /usr/bin/qemu-aarch64 target/usr/bin/qemu-aarch64
+            sudo cp /usr/bin/qemu-aarch64 target/usr/bin/qemu-aarch64-static
+          fi
           sudo mount --bind /dev target/dev
           sudo mount --bind /proc target/proc
           sudo mount --bind /sys target/sys
@@ -161,7 +168,8 @@ jobs:
             apt-get install -yq ca-certificates curl gnupg
             install -m 0755 -d /etc/apt/keyrings
             curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-            echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
+            CODENAME=$(. /etc/os-release && echo "${VERSION_CODENAME:-bookworm}")
+            echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian ${CODENAME} stable" > /etc/apt/sources.list.d/docker.list
             apt-get update -q
             apt-get install -yq --no-install-recommends docker-ce docker-ce-cli containerd.io docker-compose-plugin
             systemctl enable docker netalertx-updater.timer netalertx
@@ -173,6 +181,7 @@ jobs:
 
       - name: Cleanup & Compress
         run: |
+          sudo rm -f target/usr/bin/qemu-aarch64-static target/usr/bin/qemu-aarch64 || true
           sudo umount -l target/boot/firmware || true
           sudo umount -l target/dev || true
           sudo umount -l target/proc || true
@@ -226,7 +235,7 @@ jobs:
             }' > "fragment_${{ matrix.variant }}.json"
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ matrix.variant }}
           path: |
@@ -246,10 +255,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
@@ -287,7 +296,7 @@ jobs:
           git push
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/*.img.xz
